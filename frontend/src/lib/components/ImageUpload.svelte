@@ -24,9 +24,9 @@
 			tween?.kill();
 			tween = gsap.from(previewEl, {
 				opacity: 0,
-				scale: 0.85,
-				duration: 0.4,
-				ease: 'back.out(1.7)',
+				scale: 0.9,
+				duration: 0.35,
+				ease: 'back.out(1.4)',
 			});
 		});
 	}
@@ -73,60 +73,54 @@
 		<img bind:this={previewEl} src={previewUrl} alt="Preview" class="preview" />
 		<div class="file-info">
 			<p class="filename">{file?.name}</p>
-			<p class="change">Click to change</p>
+			<p class="change-hint">click to change</p>
 		</div>
 	{:else}
 		<div class="empty">
-			<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-				<polyline points="17 8 12 3 7 8"/>
-				<line x1="12" y1="3" x2="12" y2="15"/>
-			</svg>
-			<p class="prompt">Drop image or click to browse</p>
-			<p class="hint">JPG, PNG, WebP</p>
+			<p class="prompt">drop image or click to browse</p>
+			<p class="hint">jpg · png · webp</p>
 		</div>
 	{/if}
 </div>
 
 <style>
 	.dropzone {
-		border: 1px dashed var(--border-hover);
+		border: 1px solid var(--border-mid);
 		border-radius: var(--radius-md);
-		padding: 1.5rem;
+		padding: 1.5rem 1.25rem;
 		text-align: center;
 		cursor: pointer;
-		transition: border-color 0.2s, background 0.2s;
-		background: transparent;
+		transition: border-color 0.15s, background 0.15s;
 	}
 
 	.dropzone:hover,
 	.dropzone.dragging {
-		border-color: var(--border-active);
-		background: var(--bg-elevated);
+		border-color: var(--border);
+		background: var(--bg-off);
 	}
 
 	.dropzone.has-file {
 		display: flex;
 		align-items: center;
-		gap: 1rem;
+		gap: 0.85rem;
 		text-align: left;
-		padding: 1rem;
+		padding: 0.85rem 1rem;
 	}
 
 	.empty {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.5rem;
-		color: var(--text-muted);
+		gap: 0.35rem;
 	}
 
 	.preview {
-		width: 64px;
-		height: 64px;
-		border-radius: var(--radius-sm);
+		width: 48px;
+		height: 48px;
 		object-fit: cover;
 		flex-shrink: 0;
+		border: 1px solid var(--border-light);
+		border-radius: var(--radius-sm);
 	}
 
 	.file-info {
@@ -134,27 +128,32 @@
 	}
 
 	.filename {
-		font-size: 0.85rem;
-		color: var(--text-primary);
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--text);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
 
-	.change {
-		font-size: 0.75rem;
-		color: var(--text-muted);
+	.change-hint {
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		color: var(--text-faint);
 		margin-top: 0.15rem;
 	}
 
 	.prompt {
-		font-size: 0.9rem;
-		color: var(--text-secondary);
+		font-family: var(--font-serif);
+		font-style: italic;
+		font-size: 0.95rem;
+		color: var(--text-dim);
 	}
 
 	.hint {
-		font-size: 0.75rem;
-		color: var(--text-muted);
 		font-family: var(--font-mono);
+		font-size: 0.6rem;
+		letter-spacing: 0.08em;
+		color: var(--text-ghost);
 	}
 </style>

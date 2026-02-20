@@ -5,12 +5,12 @@
 	let { selected = $bindable() }: { selected: string } = $props();
 
 	const presets = [
-		{ id: 'A', desc: 'Current settings' },
-		{ id: 'B', desc: 'More contrast, less bright' },
-		{ id: 'C', desc: 'Less contrast, brighter' },
-		{ id: 'D', desc: 'With gamma darkening' },
-		{ id: 'E', desc: 'More blur, less contrast' },
-		{ id: 'F', desc: 'Less blur, subtle processing' },
+		{ id: 'A', desc: 'balanced · default settings' },
+		{ id: 'B', desc: 'high contrast, low brightness' },
+		{ id: 'C', desc: 'low contrast, high brightness' },
+		{ id: 'D', desc: 'gamma darkening applied' },
+		{ id: 'E', desc: 'heavy blur, soft contrast' },
+		{ id: 'F', desc: 'sharp, subtle processing' },
 	];
 
 	let presetsEl: HTMLDivElement;
@@ -18,16 +18,16 @@
 
 	onMount(() => {
 		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-			gsap.set(presetsEl.children, { opacity: 1, scale: 1 });
+			gsap.set(presetsEl.children, { opacity: 1 });
 			return;
 		}
 
 		tween = gsap.from(Array.from(presetsEl.children), {
 			opacity: 0,
-			scale: 0.8,
+			y: 6,
 			stagger: 0.05,
-			duration: 0.35,
-			ease: 'back.out(2)',
+			duration: 0.3,
+			ease: 'power2.out',
 			onComplete: () => {
 				gsap.set(presetsEl.children, { clearProps: 'all' });
 			},
@@ -37,6 +37,8 @@
 	onDestroy(() => {
 		tween?.kill();
 	});
+
+	const activeDesc = $derived(presets.find((p) => p.id === selected)?.desc ?? '');
 </script>
 
 <div class="presets" bind:this={presetsEl}>
@@ -52,43 +54,46 @@
 	{/each}
 </div>
 
-<p class="desc">{presets.find((p) => p.id === selected)?.desc}</p>
+<p class="desc"><em>{activeDesc}</em></p>
 
 <style>
 	.presets {
 		display: flex;
+		gap: 0.3rem;
 		flex-wrap: wrap;
-		gap: 0.5rem;
 	}
 
 	.preset {
-		min-width: 3rem;
-		height: 3rem;
-		border: 1px solid var(--border);
+		width: 2.2rem;
+		height: 2.2rem;
+		border: 1px solid var(--border-mid);
 		border-radius: var(--radius-sm);
 		background: transparent;
-		color: var(--text-secondary);
+		color: var(--text-faint);
 		font-family: var(--font-mono);
-		font-size: 1rem;
-		font-weight: 600;
+		font-size: 0.72rem;
+		font-weight: 500;
 		cursor: pointer;
-		transition: all 0.15s;
+		transition: border-color 0.12s, color 0.12s, background 0.12s;
 	}
 
 	.preset:hover {
-		border-color: var(--border-hover);
-		color: var(--text-primary);
+		border-color: var(--border);
+		color: var(--text);
 	}
 
 	.preset.active {
-		border-color: var(--text-primary);
-		background: var(--text-primary);
-		color: var(--bg-primary);
+		border-color: var(--border);
+		background: var(--text);
+		color: var(--bg);
 	}
 
 	.desc {
-		font-size: 0.8rem;
-		color: var(--text-muted);
-		margin-top: 0.5rem;
+		font-family: var(--font-serif);
+		font-style: italic;
+		font-weight: 300;
+		font-size: 0.9rem;
+		color: var(--text-faint);
+		margin-top: 0.6rem;
 	}
 </style>
