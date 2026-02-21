@@ -4,33 +4,18 @@
 	import ImageUpload from '$lib/components/ImageUpload.svelte';
 	import PresetPicker from '$lib/components/PresetPicker.svelte';
 	import SvgViewer from '$lib/components/SvgViewer.svelte';
+	import PixelTransition from '$lib/components/PixelTransition.svelte';
 
 	let selectedFile = $state<File | null>(null);
 	let selectedPreset = $state('A');
 	let svgContent = $state<string | null>(null);
 	let isProcessing = $state(false);
+	let coverActive = $state(false);
 	let errorMessage = $state<string | null>(null);
 
 	let heroEl: HTMLElement;
 	let controlsEl: HTMLElement;
 	let mm: gsap.MatchMedia | null = null;
-
-	// Wrapper around SvgViewer — GSAP fades this element to manage
-	// the dim-on-processing and fade-in-on-completion transitions.
-	let viewerWrapEl: HTMLDivElement | null = null;
-
-	$effect(() => {
-		const processing = isProcessing; // tracked dependency
-		if (!viewerWrapEl) return;
-
-		if (processing) {
-			// Dim the existing preview immediately when a new run starts.
-			gsap.to(viewerWrapEl, { opacity: 0.25, duration: 0.2, ease: 'power1.out' });
-		} else {
-			// New result (or error recovery) — fade in from black.
-			gsap.fromTo(viewerWrapEl, { opacity: 0 }, { opacity: 1, duration: 0.45, ease: 'power2.out' });
-		}
-	});
 
 	function generateContourAscii(cols: number, rows: number): string {
 		const cx = (cols - 1) / 2;
@@ -96,9 +81,8 @@
 	async function generate() {
 		if (!selectedFile) return;
 		isProcessing = true;
+		coverActive = true;
 		errorMessage = null;
-		// Don't clear svgContent here — the old preview stays mounted and
-		// fades to 25% while the new one is in flight.
 
 		const formData = new FormData();
 		formData.append('image', selectedFile);
@@ -114,9 +98,14 @@
 			svgContent = await res.text();
 		} catch (e) {
 			errorMessage = e instanceof Error ? e.message : 'Something went wrong';
+			coverActive = false;
 		} finally {
 			isProcessing = false;
 		}
+	}
+
+	function onPreviewReady() {
+		if (coverActive) coverActive = false;
 	}
 </script>
 
@@ -158,11 +147,11 @@
 					<p class="ctrl-label">(generate)</p>
 					<button
 						class="generate"
-						class:processing={isProcessing}
+						class:processing={coverActive}
 						onclick={generate}
-						disabled={!selectedFile || isProcessing}
+						disabled={!selectedFile || coverActive}
 					>
-						{isProcessing ? 'processing...' : 'Generate Contours →'}
+						{coverActive ? 'processing...' : 'Generate Contours →'}
 					</button>
 					{#if errorMessage}
 						<p class="error">{errorMessage}</p>
@@ -175,10 +164,8 @@
 		<div class="result-col">
 			<div class="result">
 				{#if svgContent}
-					<!-- Viewer wrapper — GSAP dims this to 25% while processing,
-					     then fades it from 0→1 when the new result arrives. -->
-					<div class="result-viewer" bind:this={viewerWrapEl}>
-						<SvgViewer {svgContent} preset={selectedPreset} />
+					<div class="result-viewer">
+						<SvgViewer {svgContent} preset={selectedPreset} onReady={onPreviewReady} />
 					</div>
 				{:else if !isProcessing}
 					<div class="result-empty">
@@ -186,15 +173,7 @@
 					</div>
 				{/if}
 
-				<!-- Spinner: sibling (not child) of the viewer so it is never
-				     affected by the viewer wrapper's dimmed opacity.
-				     Fills the space on first generation; overlays on re-runs. -->
-				{#if isProcessing}
-					<div class="result-spinner" class:overlay={!!svgContent} aria-label="Processing">
-						<div class="spinner" role="status"></div>
-						<span class="loading-label">processing</span>
-					</div>
-				{/if}
+				<PixelTransition active={coverActive} />
 			</div>
 		</div>
 	</div>
@@ -327,8 +306,8 @@
 		overflow: hidden;
 		width: 100%;
 		padding: 0.8rem 1rem;
-		background: var(--text);
-		color: var(--bg);
+		background: var(--accent);
+		color: #ffffff;
 		border: none;
 		border-radius: var(--radius-md);
 		font-family: var(--font-sans);
@@ -380,12 +359,7 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
-	}
-
-	/* ── Result viewer wrapper (GSAP-animated) ── */
-
-	.result {
-		position: relative; /* anchor for the overlay spinner */
+		position: relative;
 	}
 
 	.result-viewer {
@@ -398,49 +372,6 @@
 	.result-viewer :global(.viewer) {
 		flex: 1;
 		min-height: 0;
-	}
-
-	/* ── Spinner (shared between first-gen fill and re-run overlay) ── */
-
-	.result-spinner {
-		/* First generation: sits in the flex flow and fills the space */
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.85rem;
-		border: 1px solid var(--border-light);
-		border-radius: var(--radius-md);
-	}
-
-	.result-spinner.overlay {
-		/* Re-run: float on top of the dimmed viewer, no border */
-		position: absolute;
-		inset: 0;
-		flex: none;
-		border: none;
-	}
-
-	.spinner {
-		width: 22px;
-		height: 22px;
-		border: 1.5px solid var(--border-light);
-		border-top-color: var(--text);
-		border-radius: 50%;
-		animation: spin 0.75s linear infinite;
-	}
-
-	.loading-label {
-		font-family: var(--font-mono);
-		font-size: 0.58rem;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		color: var(--text-faint);
-	}
-
-	@keyframes spin {
-		to { transform: rotate(360deg); }
 	}
 
 	.result-empty {

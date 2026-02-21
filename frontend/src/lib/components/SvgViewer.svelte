@@ -1,6 +1,6 @@
 <script lang="ts">
 
-	let { svgContent, preset }: { svgContent: string; preset: string } = $props();
+	let { svgContent, preset, onReady }: { svgContent: string; preset: string; onReady?: () => void } = $props();
 
 	let lensActive = $state(false);
 	let showLens = $state(false);
@@ -47,6 +47,7 @@
 				const prev = rasterBlobUrl;
 				rasterBlobUrl = URL.createObjectURL(pngBlob);
 				if (prev) URL.revokeObjectURL(prev);
+				requestAnimationFrame(() => onReady?.());
 			}, 'image/png');
 		};
 		img.src = svgUrl;
