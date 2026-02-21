@@ -53,7 +53,7 @@
 		currentTl.to(cells, {
 			opacity: 1,
 			duration: 0.001,
-			stagger: { amount: 0.55, from: 'random' },
+			stagger: { amount: 0.44, from: 'random' },
 			ease: 'none'
 		});
 	}
@@ -74,7 +74,7 @@
 		currentTl.to(cells, {
 			opacity: 0,
 			duration: 0.001,
-			stagger: { amount: 0.7, from: 'random' },
+			stagger: { amount: 0.56, from: 'random' },
 			ease: 'none'
 		});
 	}
