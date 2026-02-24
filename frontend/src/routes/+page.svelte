@@ -6,29 +6,36 @@
 	import SvgViewer from '$lib/components/SvgViewer.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 
-	let selectedFile = $state<File | null>(null);
-	let selectedPreset = $state('A');
-	let svgContent = $state<string | null>(null);
-	let isProcessing = $state(false);
-	let errorMessage = $state<string | null>(null);
+	let selectedFile  = $state<File | null>(null);
+	let selectedPreset= $state('A');
+	let svgContent    = $state<string | null>(null);
+	let isProcessing  = $state(false);
+	let errorMessage  = $state<string | null>(null);
+
+	// ASCII spinner
+	const spinFrames = ['|', '/', '—', '\\'];
+	let spinFrame = $state(0);
+	let spinInterval: ReturnType<typeof setInterval> | null = null;
+
+	$effect(() => {
+		if (isProcessing) {
+			spinInterval = setInterval(() => { spinFrame = (spinFrame + 1) % spinFrames.length; }, 120);
+		} else {
+			if (spinInterval) { clearInterval(spinInterval); spinInterval = null; }
+		}
+	});
 
 	let heroEl: HTMLElement;
 	let controlsEl: HTMLElement;
+	let viewerWrapEl: HTMLDivElement | null = null;
 	let mm: gsap.MatchMedia | null = null;
 
-	// Wrapper around SvgViewer — GSAP fades this element to manage
-	// the dim-on-processing and fade-in-on-completion transitions.
-	let viewerWrapEl: HTMLDivElement | null = null;
-
 	$effect(() => {
-		const processing = isProcessing; // tracked dependency
+		const processing = isProcessing;
 		if (!viewerWrapEl) return;
-
 		if (processing) {
-			// Dim the existing preview immediately when a new run starts.
 			gsap.to(viewerWrapEl, { opacity: 0.25, duration: 0.2, ease: 'power1.out' });
 		} else {
-			// New result (or error recovery) — fade in from black.
 			gsap.fromTo(viewerWrapEl, { opacity: 0 }, { opacity: 1, duration: 0.45, ease: 'power2.out' });
 		}
 	});
@@ -38,20 +45,16 @@
 		const cy = (rows - 1) / 2;
 		const chars = ' ·.:-=+*#@';
 		const lines: string[] = [];
-
 		for (let y = 0; y < rows; y++) {
 			let line = '';
 			for (let x = 0; x < cols; x++) {
 				const dx = (x - cx) / (cx * 0.88);
 				const dy = (y - cy) / (cy * 0.88) * 1.85;
-				const d = Math.sqrt(dx * dx + dy * dy);
-
+				const d  = Math.sqrt(dx * dx + dy * dy);
 				if (d > 1.04) { line += ' '; continue; }
-
 				const ringPhase = (d * 11) % 1;
 				if (ringPhase < 0.14) {
-					const ci = Math.floor((1 - d) * (chars.length - 1));
-					line += chars[Math.max(1, ci)];
+					line += chars[Math.max(1, Math.floor((1 - d) * (chars.length - 1)))];
 				} else {
 					line += ' ';
 				}
@@ -68,38 +71,34 @@
 		const sections  = Array.from(controlsEl.querySelectorAll('.ctrl-section'));
 
 		mm = gsap.matchMedia();
-
 		mm.add({
 			noMotion:  '(prefers-reduced-motion: reduce)',
 			isDesktop: '(min-width: 820px)',
 		}, (ctx) => {
 			const { noMotion, isDesktop } = ctx.conditions!;
-
 			if (noMotion) {
 				gsap.set([...heroItems, ...sections], { opacity: 1 });
 				return;
 			}
-
 			const tl = gsap.timeline({
 				defaults: { ease: 'power3.out' },
 				onComplete: () => gsap.set([...heroItems, ...sections], { clearProps: 'all' }),
 			});
-
-			tl.from(heroItems, { opacity: 0, y: isDesktop ? -12 : -6, stagger: 0.1, duration: 0.55 })
-			  .from(sections,  { opacity: 0, y: isDesktop ? 16 : 8,  stagger: 0.08, duration: 0.4 }, '-=0.25');
-
+			tl.from(heroItems, { opacity: 0, y: isDesktop ? -10 : -5, stagger: 0.08, duration: 0.45, delay: 0.25 })
+			  .from(sections,  { opacity: 0, y: isDesktop ? 12 : 6,  stagger: 0.06, duration: 0.35 }, '-=0.2');
 			return () => tl.kill();
 		});
 	});
 
-	onDestroy(() => { mm?.kill(); });
+	onDestroy(() => {
+		mm?.kill();
+		if (spinInterval) clearInterval(spinInterval);
+	});
 
 	async function generate() {
 		if (!selectedFile) return;
-		isProcessing = true;
-		errorMessage = null;
-		// Don't clear svgContent here — the old preview stays mounted and
-		// fades to 25% while the new one is in flight.
+		isProcessing  = true;
+		errorMessage  = null;
 
 		const formData = new FormData();
 		formData.append('image', selectedFile);
@@ -108,152 +107,272 @@
 		try {
 			const res = await fetch('/api/process', { method: 'POST', body: formData });
 			if (!res.ok) {
-				let detail = 'Processing failed';
+				let detail = 'processing failed';
 				try { const err = await res.json(); detail = err.detail || detail; } catch {}
 				throw new Error(detail);
 			}
 			svgContent = await res.text();
 		} catch (e) {
-			errorMessage = e instanceof Error ? e.message : 'Something went wrong';
+			errorMessage = e instanceof Error ? e.message : 'something went wrong';
 		} finally {
 			isProcessing = false;
 		}
 	}
 </script>
 
+<!-- Fixed desktop background with teal blobs -->
+<div class="desktop-bg" aria-hidden="true">
+	<div class="blob blob-1"></div>
+	<div class="blob blob-2"></div>
+	<div class="blob blob-3"></div>
+</div>
+
 <Navbar />
 
-<div class="page">
-	<!-- Main: left panel (header + controls) | right panel (result) -->
-	<div class="main">
-		<div class="left-panel">
-			<!-- Header lives here, same column as controls -->
-			<header class="hero" bind:this={heroEl}>
-				<h1>
-					<span class="h1-sans">fast marching</span>
-					<em class="h1-serif">Contours</em>
-				</h1>
-				<p class="hero-sub">photographic line art via wave-front propagation</p>
-			</header>
-
-			<!-- Controls -->
-			<div class="controls" bind:this={controlsEl}>
-				<div class="ctrl-section">
-					<p class="ctrl-label">(image)</p>
-					<ImageUpload bind:file={selectedFile} />
-				</div>
-
-				<div class="ctrl-section">
-					<p class="ctrl-label">(preset)</p>
-					<PresetPicker bind:selected={selectedPreset} />
-				</div>
-
-				<div class="ctrl-section">
-					<p class="ctrl-label">(generate)</p>
-					<button
-						class="generate"
-						class:processing={isProcessing}
-						onclick={generate}
-						disabled={!selectedFile || isProcessing}
-					>
-						{isProcessing ? 'processing...' : 'Generate Contours →'}
-					</button>
-					{#if errorMessage}
-						<p class="error">{errorMessage}</p>
-					{/if}
-				</div>
+<!-- Desktop canvas — sits below taskbar -->
+<div class="desktop">
+	<!-- Floating app window -->
+	<div class="window">
+		<!-- Window chrome: dots + title -->
+		<div class="window-chrome">
+			<div class="window-dots">
+				<span class="dot"></span>
+				<span class="dot"></span>
+			</div>
+			<span class="window-title">fast-marching-contours — image processor</span>
+			<div class="window-dots" style="visibility:hidden" aria-hidden="true">
+				<span class="dot"></span>
+				<span class="dot"></span>
 			</div>
 		</div>
 
-		<!-- Result column: fills remaining space, image constrained within -->
-		<div class="result-col">
-			<div class="result">
-				{#if svgContent}
-					<!-- Viewer wrapper — GSAP dims this to 25% while processing,
-					     then fades it from 0→1 when the new result arrives. -->
-					<div class="result-viewer" bind:this={viewerWrapEl}>
-						<SvgViewer {svgContent} preset={selectedPreset} />
-					</div>
-				{:else if !isProcessing}
-					<div class="result-empty">
-						<pre class="ascii-art" aria-hidden="true">{asciiArt}</pre>
-					</div>
-				{/if}
+		<!-- Window body: two-panel layout -->
+		<div class="window-body">
+			<!-- Left panel: header + controls -->
+			<div class="left-panel">
+				<header class="hero" bind:this={heroEl}>
+					<p class="hero-prompt">$ image-processor v1.0</p>
+					<h1>fast&#8209;marching<br>contours</h1>
+					<p class="hero-sub">photographic line art via wavefront propagation</p>
+				</header>
 
-				<!-- Spinner: sibling (not child) of the viewer so it is never
-				     affected by the viewer wrapper's dimmed opacity.
-				     Fills the space on first generation; overlays on re-runs. -->
-				{#if isProcessing}
-					<div class="result-spinner" class:overlay={!!svgContent} aria-label="Processing">
-						<div class="spinner" role="status"></div>
-						<span class="loading-label">processing</span>
+				<div class="controls" bind:this={controlsEl}>
+					<div class="ctrl-section">
+						<p class="ctrl-label">&gt; image</p>
+						<ImageUpload bind:file={selectedFile} />
 					</div>
-				{/if}
+
+					<div class="ctrl-section">
+						<p class="ctrl-label">&gt; preset</p>
+						<PresetPicker bind:selected={selectedPreset} />
+					</div>
+
+					<div class="ctrl-section">
+						<p class="ctrl-label">&gt; run</p>
+						<button
+							class="generate"
+							class:processing={isProcessing}
+							onclick={generate}
+							disabled={!selectedFile || isProcessing}
+						>
+							{#if isProcessing}
+								<span class="spin-char" aria-hidden="true">{spinFrames[spinFrame]}</span>
+								processing...
+							{:else}
+								$ generate-contours
+							{/if}
+						</button>
+						{#if errorMessage}
+							<p class="error">! {errorMessage}</p>
+						{/if}
+					</div>
+				</div>
+			</div>
+
+			<!-- Result column -->
+			<div class="result-col">
+				<div class="result">
+					{#if svgContent}
+						<div class="result-viewer" bind:this={viewerWrapEl}>
+							<SvgViewer {svgContent} preset={selectedPreset} />
+						</div>
+					{:else if !isProcessing}
+						<div class="result-empty">
+							<pre class="ascii-art" aria-hidden="true">{asciiArt}</pre>
+							<p class="empty-hint">no output yet — drop an image and run</p>
+						</div>
+					{/if}
+
+					{#if isProcessing}
+						<div class="result-spinner" class:overlay={!!svgContent} aria-label="Processing">
+							<p class="spinner-text" role="status">
+								{spinFrames[spinFrame]} processing image
+							</p>
+						</div>
+					{/if}
+				</div>
 			</div>
 		</div>
 	</div>
 </div>
 
 <style>
-	/* ── App shell ── */
+	/* ── Desktop background ── */
 
-	.page {
-		display: flex;
-		flex-direction: column;
+	.desktop-bg {
+		position: fixed;
+		inset: 0;
+		z-index: -1;
+		background: var(--bg);
+		overflow: hidden;
+	}
+
+	.blob {
+		position: absolute;
+		background: var(--accent);
+		opacity: 0.55;
+	}
+
+	/* Upper-left sweeping ribbon */
+	.blob-1 {
+		width: 75%;
+		height: 60%;
+		top: -18%;
+		left: -8%;
+		border-radius: 35% 65% 70% 30% / 38% 32% 68% 62%;
+		transform: rotate(-10deg);
+	}
+
+	/* Lower-right ribbon */
+	.blob-2 {
+		width: 65%;
+		height: 55%;
+		bottom: -14%;
+		right: -6%;
+		border-radius: 60% 40% 38% 62% / 55% 60% 40% 45%;
+		transform: rotate(14deg);
+	}
+
+	/* Small accent blob mid-left */
+	.blob-3 {
+		width: 28%;
+		height: 30%;
+		bottom: 8%;
+		left: 2%;
+		border-radius: 50% 50% 40% 60% / 50% 40% 60% 50%;
+		transform: rotate(-5deg);
+		opacity: 0.3;
+	}
+
+	/* ── Desktop canvas ── */
+
+	.desktop {
 		min-height: 100dvh;
-		padding-top: 2.75rem; /* clear the fixed navbar */
+		padding: calc(2rem + 1rem) 1.25rem 1.25rem; /* taskbar(2rem) + gap(1rem) */
+		display: flex;
+		align-items: flex-start;
+		justify-content: center;
 	}
 
-	/* ── Main area ── */
+	/* ── Window ── */
 
-	.main {
-		flex: 1;
+	.window {
+		width: 100%;
+		max-width: 1280px;
+		background: var(--bg-window);
+		border: 2.5px solid var(--border);
+		border-radius: var(--radius-window);
+		overflow: hidden;
+		box-shadow: 6px 6px 0 rgba(28, 25, 22, 0.18);
 		display: flex;
 		flex-direction: column;
 	}
 
-	/* ── Left panel (hero + controls) ── */
+	/* Window chrome bar */
+	.window-chrome {
+		background: var(--bg-inset);
+		border-bottom: 2px solid var(--border);
+		height: 2rem;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 0.75rem;
+		flex-shrink: 0;
+	}
+
+	.window-dots {
+		display: flex;
+		gap: 0.35rem;
+		flex-shrink: 0;
+	}
+
+	.dot {
+		width: 11px;
+		height: 11px;
+		border-radius: 50%;
+		border: 1.5px solid var(--border);
+		background: transparent;
+		display: block;
+	}
+
+	.window-title {
+		font-family: var(--font-mono);
+		font-size: 0.6rem;
+		letter-spacing: 0.05em;
+		color: var(--text-dim);
+		text-align: center;
+		flex: 1;
+	}
+
+	/* ── Window body ── */
+
+	.window-body {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+	}
+
+	/* ── Left panel ── */
 
 	.left-panel {
 		display: flex;
 		flex-direction: column;
-		border-bottom: 1px solid var(--border-light);
+		border-bottom: 2px solid var(--border);
 	}
 
+	/* ── Hero header ── */
+
 	.hero {
-		padding: 1.5rem 1.5rem 1.25rem;
-		border-bottom: 1px solid var(--border-light);
+		padding: 1.4rem 1.4rem 1.1rem;
+		border-bottom: 2px solid var(--border);
+	}
+
+	.hero-prompt {
+		font-family: var(--font-mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.08em;
+		color: var(--accent-dark);
+		margin-bottom: 0.5rem;
 	}
 
 	h1 {
-		display: flex;
-		flex-direction: column;
-		line-height: 0.93;
-	}
-
-	.h1-sans {
-		font-family: var(--font-sans);
-		font-weight: 700;
-		font-size: clamp(1.6rem, 5vw, 2rem);
-		letter-spacing: -0.025em;
-	}
-
-	.h1-serif {
-		font-family: var(--font-serif);
-		font-style: italic;
-		font-weight: 300;
-		font-size: clamp(2.2rem, 7vw, 2.8rem);
-		letter-spacing: -0.01em;
+		font-family: var(--font-mono);
+		font-weight: 500;
+		font-size: clamp(1.25rem, 5vw, 1.75rem);
+		line-height: 1.05;
+		letter-spacing: -0.02em;
+		color: var(--text);
 	}
 
 	.hero-sub {
-		margin-top: 0.75rem;
+		margin-top: 0.65rem;
 		font-family: var(--font-mono);
-		font-size: 0.6rem;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
+		font-size: 0.55rem;
+		letter-spacing: 0.08em;
 		color: var(--text-faint);
 	}
+
+	/* ── Controls ── */
 
 	.controls {
 		display: flex;
@@ -261,16 +380,16 @@
 	}
 
 	.ctrl-section {
-		padding: 1.1rem 1.5rem;
+		padding: 1rem 1.4rem;
 		border-bottom: 1px solid var(--border-light);
 	}
 
 	.ctrl-label {
-		font-family: var(--font-serif);
-		font-style: italic;
-		font-size: 0.95rem;
-		color: var(--text-dim);
-		margin-bottom: 0.65rem;
+		font-family: var(--font-mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.08em;
+		color: var(--accent-dark);
+		margin-bottom: 0.6rem;
 	}
 
 	/* ── Generate button ── */
@@ -279,30 +398,32 @@
 		position: relative;
 		overflow: hidden;
 		width: 100%;
-		padding: 0.8rem 1rem;
+		padding: 0.7rem 1rem;
 		background: var(--text);
 		color: var(--bg);
-		border: none;
-		border-radius: var(--radius-md);
-		font-family: var(--font-sans);
-		font-weight: 600;
-		font-size: 0.75rem;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
+		border: 2px solid var(--border);
+		border-radius: var(--radius-sm);
+		font-family: var(--font-mono);
+		font-weight: 500;
+		font-size: 0.68rem;
+		letter-spacing: 0.04em;
 		cursor: pointer;
 		text-align: left;
-		transition: opacity 0.15s;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		transition: opacity 0.12s;
 	}
 
 	.generate:hover:not(:disabled) { opacity: 0.82; }
-	.generate:disabled { opacity: 0.2; cursor: not-allowed; }
+	.generate:disabled { opacity: 0.28; cursor: not-allowed; }
 
 	.generate.processing::after {
 		content: '';
 		position: absolute;
 		inset: 0;
-		background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 45%, rgba(255,255,255,0.18) 55%, transparent 100%);
-		animation: sweep 1.6s ease-in-out infinite;
+		background: linear-gradient(90deg, transparent 0%, rgba(127,206,206,0.22) 45%, rgba(127,206,206,0.22) 55%, transparent 100%);
+		animation: sweep 1.4s ease-in-out infinite;
 		pointer-events: none;
 	}
 
@@ -311,11 +432,18 @@
 		to   { transform: translateX(120%); }
 	}
 
+	.spin-char {
+		display: inline-block;
+		width: 0.8em;
+		text-align: center;
+	}
+
 	.error {
-		margin-top: 0.65rem;
+		margin-top: 0.6rem;
 		font-family: var(--font-mono);
-		font-size: 0.65rem;
+		font-size: 0.62rem;
 		color: var(--error);
+		letter-spacing: 0.04em;
 	}
 
 	/* ── Result column ── */
@@ -324,8 +452,8 @@
 		flex: 1;
 		display: flex;
 		flex-direction: column;
-		padding: 1.5rem;
-		min-height: 320px;
+		padding: 1.25rem;
+		min-height: 300px;
 	}
 
 	.result {
@@ -333,12 +461,7 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
-	}
-
-	/* ── Result viewer wrapper (GSAP-animated) ── */
-
-	.result {
-		position: relative; /* anchor for the overlay spinner */
+		position: relative;
 	}
 
 	.result-viewer {
@@ -353,61 +476,22 @@
 		min-height: 0;
 	}
 
-	/* ── Spinner (shared between first-gen fill and re-run overlay) ── */
+	/* ── Empty state ── */
 
-	.result-spinner {
-		/* First generation: sits in the flex flow and fills the space */
+	.result-empty {
 		flex: 1;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 0.85rem;
-		border: 1px solid var(--border-light);
-		border-radius: var(--radius-md);
-	}
-
-	.result-spinner.overlay {
-		/* Re-run: float on top of the dimmed viewer, no border */
-		position: absolute;
-		inset: 0;
-		flex: none;
-		border: none;
-	}
-
-	.spinner {
-		width: 22px;
-		height: 22px;
-		border: 1.5px solid var(--border-light);
-		border-top-color: var(--text);
-		border-radius: 50%;
-		animation: spin 0.75s linear infinite;
-	}
-
-	.loading-label {
-		font-family: var(--font-mono);
-		font-size: 0.58rem;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		color: var(--text-faint);
-	}
-
-	@keyframes spin {
-		to { transform: rotate(360deg); }
-	}
-
-	.result-empty {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border: 1px solid var(--border-light);
+		gap: 1.25rem;
+		border: 2px dashed var(--border-light);
 		border-radius: var(--radius-md);
 	}
 
 	.ascii-art {
 		font-family: var(--font-mono);
-		font-size: clamp(0.5rem, 1.2vw, 0.72rem);
+		font-size: clamp(0.48rem, 1.1vw, 0.68rem);
 		line-height: 1.35;
 		color: var(--text-ghost);
 		white-space: pre;
@@ -416,15 +500,52 @@
 		user-select: none;
 	}
 
-	/* ── Desktop: true app layout, viewport-bounded ── */
+	.empty-hint {
+		font-family: var(--font-mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.06em;
+		color: var(--text-ghost);
+	}
+
+	/* ── Spinner ── */
+
+	.result-spinner {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 2px dashed var(--border-light);
+		border-radius: var(--radius-md);
+	}
+
+	.result-spinner.overlay {
+		position: absolute;
+		inset: 0;
+		flex: none;
+		border: none;
+	}
+
+	.spinner-text {
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		letter-spacing: 0.08em;
+		color: var(--text-dim);
+	}
+
+	/* ── Desktop: true app layout ── */
 
 	@media (min-width: 820px) {
-		.page {
+		.desktop {
 			height: 100dvh;
 			overflow: hidden;
+			align-items: center;
 		}
 
-		.main {
+		.window {
+			height: calc(100% - 2rem); /* subtract extra gap */
+		}
+
+		.window-body {
 			flex-direction: row;
 			min-height: 0;
 			flex: 1;
@@ -432,10 +553,10 @@
 		}
 
 		.left-panel {
-			width: 300px;
+			width: 288px;
 			flex-shrink: 0;
 			border-bottom: none;
-			border-right: 1px solid var(--border-light);
+			border-right: 2px solid var(--border);
 			overflow-y: auto;
 		}
 

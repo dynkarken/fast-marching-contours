@@ -1,25 +1,31 @@
 :root {
-	--bg: #ffffff;
-	--bg-off: #f9f9f7;
+	--bg:        #ece4d0;   /* warm cream desktop */
+	--bg-off:    #e4dbc8;
+	--bg-window: #e9e1ce;   /* window body */
+	--bg-inset:  #dfd6c2;   /* inset panels / inputs */
 
-	--text: #0c0c0c;
-	--text-dim: #555555;
-	--text-faint: #aaaaaa;
-	--text-ghost: #d4d4d4;
+	--accent:      #7fcece; /* teal — the wavy blobs & fill */
+	--accent-dark: #55aaaa;
 
-	--border: #0c0c0c;
-	--border-light: #e8e8e8;
-	--border-mid: #c8c8c8;
+	--text:       #1c1916;
+	--text-dim:   #5e5448;
+	--text-faint: #9e9080;
+	--text-ghost: #c4b5a5;
 
-	--error: #c04040;
+	--border:       #1c1916; /* thick dark border — used everywhere */
+	--border-light: #c8bba8;
+	--border-mid:   #a89880;
+
+	--error: #b83a3a;
 
 	--font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-	--font-sans: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
-	--font-mono: 'DM Mono', 'Fira Code', ui-monospace, monospace;
+	--font-sans:  'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+	--font-mono:  'DM Mono', 'Fira Code', ui-monospace, monospace;
 
-	--radius-sm: 3px;
-	--radius-md: 5px;
-	--radius-lg: 8px;
+	--radius-sm: 4px;
+	--radius-md: 6px;
+	--radius-lg: 12px;
+	--radius-window: 10px;
 }
 
 *,
@@ -36,7 +42,7 @@ html {
 }
 
 body {
-	font-family: var(--font-sans);
+	font-family: var(--font-mono);
 	background: var(--bg);
 	color: var(--text);
 	line-height: 1.5;
@@ -44,15 +50,15 @@ body {
 }
 
 ::selection {
-	background: rgba(0, 0, 0, 0.08);
+	background: rgba(127, 206, 206, 0.35);
 }
 
 :focus-visible {
-	outline: 1px solid var(--text);
-	outline-offset: 3px;
+	outline: 2px solid var(--border);
+	outline-offset: 2px;
 }
 
 button:focus-visible {
-	outline: 1px solid var(--text);
-	outline-offset: 3px;
+	outline: 2px solid var(--border);
+	outline-offset: 2px;
 }

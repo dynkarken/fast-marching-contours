@@ -24,8 +24,8 @@
 			tween?.kill();
 			tween = gsap.from(previewEl, {
 				opacity: 0,
-				scale: 0.9,
-				duration: 0.35,
+				scale: 0.92,
+				duration: 0.3,
 				ease: 'back.out(1.4)',
 			});
 		});
@@ -73,11 +73,11 @@
 		<img bind:this={previewEl} src={previewUrl} alt="Preview" class="preview" />
 		<div class="file-info">
 			<p class="filename">{file?.name}</p>
-			<p class="change-hint">click to change</p>
+			<p class="change-hint">[ click to change ]</p>
 		</div>
 	{:else}
 		<div class="empty">
-			<p class="prompt">drop image or click to browse</p>
+			<p class="prompt">[ drop image or click to browse ]</p>
 			<p class="hint">jpg · png · webp</p>
 		</div>
 	{/if}
@@ -85,51 +85,50 @@
 
 <style>
 	.dropzone {
-		border: 1px solid var(--border-mid);
-		border-radius: var(--radius-md);
-		padding: 1.5rem 1.25rem;
+		border: 2px dashed var(--border-light);
+		border-radius: var(--radius-sm);
+		padding: 1.25rem 1rem;
 		text-align: center;
 		cursor: pointer;
-		transition: border-color 0.15s, background 0.15s;
+		background: var(--bg-inset);
+		transition: border-color 0.12s, background 0.12s;
 	}
 
 	.dropzone:hover,
 	.dropzone.dragging {
-		border-color: var(--border);
+		border-color: var(--accent-dark);
 		background: var(--bg-off);
 	}
 
 	.dropzone.has-file {
 		display: flex;
 		align-items: center;
-		gap: 0.85rem;
+		gap: 0.75rem;
 		text-align: left;
-		padding: 0.85rem 1rem;
+		padding: 0.7rem 0.85rem;
 	}
 
 	.empty {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.35rem;
+		gap: 0.3rem;
 	}
 
 	.preview {
-		width: 48px;
-		height: 48px;
+		width: 44px;
+		height: 44px;
 		object-fit: cover;
 		flex-shrink: 0;
-		border: 1px solid var(--border-light);
+		border: 2px solid var(--border);
 		border-radius: var(--radius-sm);
 	}
 
-	.file-info {
-		min-width: 0;
-	}
+	.file-info { min-width: 0; }
 
 	.filename {
 		font-family: var(--font-mono);
-		font-size: 0.72rem;
+		font-size: 0.66rem;
 		color: var(--text);
 		white-space: nowrap;
 		overflow: hidden;
@@ -138,21 +137,22 @@
 
 	.change-hint {
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: 0.58rem;
 		color: var(--text-faint);
-		margin-top: 0.15rem;
+		margin-top: 0.1rem;
+		letter-spacing: 0.04em;
 	}
 
 	.prompt {
-		font-family: var(--font-serif);
-		font-style: italic;
-		font-size: 0.95rem;
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
 		color: var(--text-dim);
+		letter-spacing: 0.02em;
 	}
 
 	.hint {
 		font-family: var(--font-mono);
-		font-size: 0.6rem;
+		font-size: 0.55rem;
 		letter-spacing: 0.08em;
 		color: var(--text-ghost);
 	}
