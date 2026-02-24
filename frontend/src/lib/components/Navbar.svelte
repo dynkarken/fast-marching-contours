@@ -16,9 +16,9 @@
 	let fillEls: HTMLElement[] = [];
 	let textEls: HTMLElement[] = [];
 
-	// Teal fill — text stays dark (accent is light enough)
-	const C_ON   = '#1c1916';
-	const C_REST = '#9e9080';
+	// White fill — text inverts to black on hover/active
+	const C_ON   = '#080808';
+	const C_REST = '#505050';
 
 	type Edge = 'left' | 'right' | 'top' | 'bottom';
 
@@ -227,7 +227,7 @@
 		height: 100%;
 	}
 
-	/* Teal fill — expands on hover/active */
+	/* White fill — expands on hover/active, inverts text to black */
 	.fill {
 		position: absolute;
 		inset: 0;

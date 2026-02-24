@@ -1,22 +1,22 @@
 :root {
-	--bg:        #ece4d0;   /* warm cream desktop */
-	--bg-off:    #e4dbc8;
-	--bg-window: #e9e1ce;   /* window body */
-	--bg-inset:  #dfd6c2;   /* inset panels / inputs */
+	--bg:        #080808;   /* near-black */
+	--bg-off:    #0f0f0f;
+	--bg-window: #101010;   /* window body */
+	--bg-inset:  #181818;   /* inset panels / inputs */
 
-	--accent:      #7fcece; /* teal — the wavy blobs & fill */
-	--accent-dark: #55aaaa;
+	--accent:      #f0f0f0; /* near-white — fill & highlights */
+	--accent-dark: #888888; /* mid-gray — prompt chars */
 
-	--text:       #1c1916;
-	--text-dim:   #5e5448;
-	--text-faint: #9e9080;
-	--text-ghost: #c4b5a5;
+	--text:       #f0f0f0;
+	--text-dim:   #909090;
+	--text-faint: #505050;
+	--text-ghost: #2e2e2e;
 
-	--border:       #1c1916; /* thick dark border — used everywhere */
-	--border-light: #c8bba8;
-	--border-mid:   #a89880;
+	--border:       #f0f0f0; /* white border */
+	--border-light: #252525;
+	--border-mid:   #383838;
 
-	--error: #b83a3a;
+	--error: #cc4444;
 
 	--font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
 	--font-sans:  'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
@@ -50,7 +50,7 @@ body {
 }
 
 ::selection {
-	background: rgba(127, 206, 206, 0.35);
+	background: rgba(240, 240, 240, 0.2);
 }
 
 :focus-visible {
