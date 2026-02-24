@@ -16,9 +16,9 @@
 	let fillEls: HTMLElement[] = [];
 	let textEls: HTMLElement[] = [];
 
-	// White fill — text inverts to black on hover/active
-	const C_ON   = '#080808';
-	const C_REST = '#505050';
+	// Black fill — text inverts to white on hover/active
+	const C_ON   = '#f5f5f5';
+	const C_REST = '#a0a0a0';
 
 	type Edge = 'left' | 'right' | 'top' | 'bottom';
 

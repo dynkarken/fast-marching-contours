@@ -229,7 +229,7 @@
 
 	.blob {
 		position: absolute;
-		background: #1c1c1c; /* very dark gray — barely-there depth on black */
+		background: #e0e0e0; /* light gray — barely-there depth on white */
 	}
 
 	/* Upper-left sweeping ribbon */
@@ -260,7 +260,7 @@
 		left: 2%;
 		border-radius: 50% 50% 40% 60% / 50% 40% 60% 50%;
 		transform: rotate(-5deg);
-		background: #161616;
+		background: #e6e6e6;
 	}
 
 	/* ── Desktop canvas ── */
@@ -421,7 +421,7 @@
 		content: '';
 		position: absolute;
 		inset: 0;
-		background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 45%, rgba(255,255,255,0.1) 55%, transparent 100%);
+		background: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.08) 45%, rgba(0,0,0,0.08) 55%, transparent 100%);
 		animation: sweep 1.4s ease-in-out infinite;
 		pointer-events: none;
 	}

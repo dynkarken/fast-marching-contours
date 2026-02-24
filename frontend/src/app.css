@@ -1,20 +1,20 @@
 :root {
-	--bg:        #080808;   /* near-black */
-	--bg-off:    #0f0f0f;
-	--bg-window: #101010;   /* window body */
-	--bg-inset:  #181818;   /* inset panels / inputs */
+	--bg:        #f5f5f5;   /* near-white */
+	--bg-off:    #ebebeb;
+	--bg-window: #f0f0f0;   /* window body */
+	--bg-inset:  #e4e4e4;   /* inset panels / inputs */
 
-	--accent:      #f0f0f0; /* near-white — fill & highlights */
-	--accent-dark: #888888; /* mid-gray — prompt chars */
+	--accent:      #080808; /* near-black — fill & highlights */
+	--accent-dark: #555555; /* mid-gray — prompt chars */
 
-	--text:       #f0f0f0;
-	--text-dim:   #909090;
-	--text-faint: #505050;
-	--text-ghost: #2e2e2e;
+	--text:       #080808;
+	--text-dim:   #606060;
+	--text-faint: #a0a0a0;
+	--text-ghost: #cccccc;
 
-	--border:       #f0f0f0; /* white border */
-	--border-light: #252525;
-	--border-mid:   #383838;
+	--border:       #080808; /* black border */
+	--border-light: #d0d0d0;
+	--border-mid:   #b0b0b0;
 
 	--error: #cc4444;
 
