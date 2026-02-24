@@ -98,8 +98,8 @@
 			if (i !== activeIndex) gsap.set(el, { color: C_REST });
 		});
 
-		// Entrance
-		gsap.from(navEl, { y: -36, opacity: 0, duration: 0.5, ease: 'power3.out', delay: 0.05 });
+		// Entrance — no y-translate (frame overflow:hidden would clip it)
+		gsap.from(navEl, { opacity: 0, duration: 0.5, ease: 'power2.out', delay: 0.05 });
 
 		// Clock
 		tick();
@@ -148,11 +148,10 @@
 
 <style>
 	.taskbar {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		z-index: 100;
+		position: relative;
+		width: 100%;
+		flex-shrink: 0;
+		z-index: 10;
 		height: 2rem; /* 32px */
 		background: var(--bg-window);
 		border-bottom: 2px solid var(--border);

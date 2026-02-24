@@ -121,16 +121,19 @@
 </script>
 
 <!-- Fixed desktop background with teal blobs -->
-<div class="desktop-bg" aria-hidden="true">
-	<div class="blob blob-1"></div>
-	<div class="blob blob-2"></div>
-	<div class="blob blob-3"></div>
-</div>
+<!-- Outer screen frame — contains everything including the taskbar -->
+<div class="screen-frame">
+	<!-- Background blobs clipped to the frame -->
+	<div class="desktop-bg" aria-hidden="true">
+		<div class="blob blob-1"></div>
+		<div class="blob blob-2"></div>
+		<div class="blob blob-3"></div>
+	</div>
 
-<Navbar />
+	<Navbar />
 
-<!-- Desktop canvas — sits below taskbar -->
-<div class="desktop">
+	<!-- Desktop canvas — flex-1 below the taskbar -->
+	<div class="desktop">
 	<!-- Floating app window -->
 	<div class="window">
 		<!-- Window chrome: dots + title -->
@@ -214,15 +217,30 @@
 			</div>
 		</div>
 	</div>
-</div>
+</div><!-- end .desktop -->
+</div><!-- end .screen-frame -->
 
 <style>
-	/* ── Desktop background ── */
+	/* ── Screen frame — outer rounded border container ── */
+
+	.screen-frame {
+		margin: 0.6rem;
+		height: calc(100dvh - 1.2rem);
+		border: 2.5px solid var(--border);
+		border-radius: 14px;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		position: relative;
+		box-shadow: 0 4px 32px rgba(0, 0, 0, 0.12);
+	}
+
+	/* ── Desktop background (clipped to frame) ── */
 
 	.desktop-bg {
-		position: fixed;
+		position: absolute;
 		inset: 0;
-		z-index: -1;
+		z-index: 0;
 		background: var(--bg);
 		overflow: hidden;
 	}
@@ -263,14 +281,17 @@
 		background: #e6e6e6;
 	}
 
-	/* ── Desktop canvas ── */
+	/* ── Desktop canvas (flex-1 below taskbar, inside frame) ── */
 
 	.desktop {
-		min-height: 100dvh;
-		padding: calc(2rem + 1rem) 1.25rem 1.25rem; /* taskbar(2rem) + gap(1rem) */
+		flex: 1;
+		min-height: 0;
+		padding: 1rem 1.25rem 1.25rem;
 		display: flex;
 		align-items: flex-start;
 		justify-content: center;
+		position: relative;
+		z-index: 1;
 	}
 
 	/* ── Window ── */
@@ -535,13 +556,13 @@
 
 	@media (min-width: 820px) {
 		.desktop {
-			height: 100dvh;
+			height: 100%;
 			overflow: hidden;
 			align-items: center;
 		}
 
 		.window {
-			height: calc(100% - 2rem); /* subtract extra gap */
+			height: 100%;
 		}
 
 		.window-body {
