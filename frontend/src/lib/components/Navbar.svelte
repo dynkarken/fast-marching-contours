@@ -17,40 +17,59 @@
 	let textEls: HTMLElement[] = [];
 
 	// Colors — match CSS vars directly since GSAP can't read var()
-	const C_FILL  = '#0c0c0c'; // fill background
 	const C_ON    = '#ffffff'; // text sitting on fill
 	const C_REST  = '#888888'; // dim resting text for inactive items
 
-	/** Convert a MouseEvent to a percentage position relative to its target element. */
-	function cursorPct(e: MouseEvent): { x: number; y: number } {
+	type Edge = 'left' | 'right' | 'top' | 'bottom';
+
+	/** Determine which edge a MouseEvent is closest to, relative to its target. */
+	function getEdge(e: MouseEvent): Edge {
 		const el = e.currentTarget as HTMLElement;
 		const r  = el.getBoundingClientRect();
-		return {
-			x: Math.round(((e.clientX - r.left) / r.width)  * 100),
-			y: Math.round(((e.clientY - r.top)  / r.height) * 100),
-		};
+		const x  = (e.clientX - r.left) / r.width  * 100;
+		const y  = (e.clientY - r.top)  / r.height * 100;
+		const dl = x, dr = 100 - x, dt = y, db = 100 - y;
+		const m  = Math.min(dl, dr, dt, db);
+		if (m === dl) return 'left';
+		if (m === dr) return 'right';
+		if (m === dt) return 'top';
+		return 'bottom';
+	}
+
+	/**
+	 * The collapsed inset() clip-path for a given entry/exit edge.
+	 * Enter: animate FROM this value TO 'inset(0 0 0 0)'.
+	 * Leave: animate FROM 'inset(0 0 0 0)' TO this value.
+	 */
+	function wipeClip(edge: Edge): string {
+		switch (edge) {
+			case 'left':   return 'inset(0 100% 0 0)';   // fill slides in/out from left
+			case 'right':  return 'inset(0 0 0 100%)';   // fill slides in/out from right
+			case 'top':    return 'inset(0 0 100% 0)';   // fill slides in/out from top
+			case 'bottom': return 'inset(100% 0 0 0)';   // fill slides in/out from bottom
+		}
 	}
 
 	function onEnter(i: number, e: MouseEvent) {
 		if (i === activeIndex) return;
-		const { x, y } = cursorPct(e);
+		const edge = getEdge(e);
 		gsap.killTweensOf(fillEls[i]);
 		gsap.killTweensOf(textEls[i]);
 		gsap.fromTo(
 			fillEls[i],
-			{ clipPath: `circle(0% at ${x}% ${y}%)` },
-			{ clipPath: `circle(200% at ${x}% ${y}%)`, duration: 0.42, ease: 'power2.out' },
+			{ clipPath: wipeClip(edge) },
+			{ clipPath: 'inset(0 0 0 0)', duration: 0.38, ease: 'power2.out' },
 		);
-		gsap.to(textEls[i], { color: C_ON, duration: 0.22, ease: 'none' });
+		gsap.to(textEls[i], { color: C_ON, duration: 0.2, ease: 'none' });
 	}
 
 	function onLeave(i: number, e: MouseEvent) {
 		if (i === activeIndex) return;
-		const { x, y } = cursorPct(e);
+		const edge = getEdge(e);
 		gsap.killTweensOf(fillEls[i]);
 		gsap.killTweensOf(textEls[i]);
-		gsap.to(fillEls[i], { clipPath: `circle(0% at ${x}% ${y}%)`, duration: 0.32, ease: 'power2.in' });
-		gsap.to(textEls[i], { color: C_REST, duration: 0.18, ease: 'none' });
+		gsap.to(fillEls[i], { clipPath: wipeClip(edge), duration: 0.28, ease: 'power2.in' });
+		gsap.to(textEls[i], { color: C_REST, duration: 0.16, ease: 'none' });
 	}
 
 	function onClick(i: number) {
@@ -59,13 +78,14 @@
 		activeIndex = i;
 		gsap.killTweensOf(fillEls[prev]);
 		gsap.killTweensOf(textEls[prev]);
-		gsap.to(fillEls[prev], { clipPath: 'circle(0% at 50% 50%)', duration: 0.32, ease: 'power2.in' });
-		gsap.to(textEls[prev], { color: C_REST, duration: 0.18, ease: 'none' });
+		// No cursor event — collapse downward by default
+		gsap.to(fillEls[prev], { clipPath: 'inset(0 0 100% 0)', duration: 0.28, ease: 'power2.in' });
+		gsap.to(textEls[prev], { color: C_REST, duration: 0.16, ease: 'none' });
 	}
 
 	onMount(() => {
-		// Active item: fill expanded from center, text white
-		gsap.set(fillEls[activeIndex], { clipPath: 'circle(200% at 50% 50%)' });
+		// Active item: fully revealed, text white
+		gsap.set(fillEls[activeIndex], { clipPath: 'inset(0 0 0 0)' });
 		gsap.set(textEls[activeIndex], { color: C_ON });
 
 		// All other items start at resting dim color
@@ -101,7 +121,7 @@
 					onmouseleave={(e) => onLeave(i, e)}
 					onclick={() => onClick(i)}
 				>
-					<!-- Expanding circle fill — same technique as before -->
+					<!-- Linear wipe fill — direction follows cursor entry/exit edge -->
 					<span class="fill" bind:this={fillEls[i]} aria-hidden="true"></span>
 
 					<!-- Label floats above fill via z-index -->
@@ -195,12 +215,12 @@
 		/* No CSS transitions — GSAP owns all motion */
 	}
 
-	/* Animated fill — starts collapsed, expands on hover/active */
+	/* Animated fill — starts collapsed to the right, expands on hover/active */
 	.fill {
 		position: absolute;
 		inset: 0;
 		background: var(--text);
-		clip-path: circle(0% at 0% 50%);
+		clip-path: inset(0 100% 0 0);
 		pointer-events: none;
 	}
 
