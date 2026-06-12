@@ -25,15 +25,20 @@
 		blobUrl = svgUrl;
 		rasterBlobUrl = null;
 
-		// Matplotlib emits pt units. Convert to CSS px (96 dpi / 72 pt/in),
-		// then multiply by RASTER_SCALE so the PNG is always rendered at a
-		// higher pixel density than the display area. Downscaling is crisp;
-		// upscaling is what causes the mushy grey appearance.
+		// Matplotlib emits pt units (convert at 96 dpi / 72 pt/in); the sketch
+		// worker emits px. Either way, multiply by RASTER_SCALE so the PNG is
+		// always rendered at a higher pixel density than the display area.
+		// Downscaling is crisp; upscaling causes the mushy grey appearance.
 		const RASTER_SCALE = 2;
-		const ptW = svgContent.match(/\bwidth="([\d.]+)pt"/);
-		const ptH = svgContent.match(/\bheight="([\d.]+)pt"/);
-		const canvasW = Math.round((ptW ? parseFloat(ptW[1]) * (96 / 72) : 1200) * RASTER_SCALE);
-		const canvasH = Math.round((ptH ? parseFloat(ptH[1]) * (96 / 72) : canvasW / RASTER_SCALE) * RASTER_SCALE);
+		const dim = (axis: 'width' | 'height'): number | null => {
+			const m = svgContent.match(new RegExp(`\\b${axis}="([\\d.]+)(pt|px)?"`));
+			if (!m) return null;
+			return parseFloat(m[1]) * (m[2] === 'pt' ? 96 / 72 : 1);
+		};
+		const svgW = dim('width');
+		const svgH = dim('height');
+		const canvasW = Math.round((svgW ?? 1200) * RASTER_SCALE);
+		const canvasH = Math.round((svgH ?? (svgW ?? 1200) * 0.75) * RASTER_SCALE);
 
 		// Rasterise the SVG to a canvas, then export as PNG blob for the main view.
 		const img = new Image();

@@ -2,9 +2,7 @@
 	import { gsap } from 'gsap';
 	import { onMount, onDestroy } from 'svelte';
 
-	let { selected = $bindable() }: { selected: string } = $props();
-
-	const presets = [
+	const CONTOUR_PRESETS = [
 		{ id: 'A', desc: 'balanced · default settings' },
 		{ id: 'B', desc: 'high contrast, low brightness' },
 		{ id: 'C', desc: 'low contrast, high brightness' },
@@ -12,6 +10,11 @@
 		{ id: 'E', desc: 'heavy blur, soft contrast' },
 		{ id: 'F', desc: 'sharp, subtle processing' },
 	];
+
+	let {
+		selected = $bindable(),
+		presets = CONTOUR_PRESETS,
+	}: { selected: string; presets?: { id: string; desc: string }[] } = $props();
 
 	let presetsEl: HTMLDivElement;
 	let tween: gsap.core.Tween | null = null;

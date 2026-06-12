@@ -5,9 +5,36 @@
 	import PresetPicker from '$lib/components/PresetPicker.svelte';
 	import SvgViewer from '$lib/components/SvgViewer.svelte';
 	import PixelTransition from '$lib/components/PixelTransition.svelte';
+	import { runSketch, SCRIBBLE_PRESETS, FLUID_PRESETS, WAVES_PRESETS } from '$lib/sketch';
+	import type { SketchPreset } from '$lib/sketch';
+
+	const STYLES = [
+		{ id: 'contours', label: 'Contours', sub: 'wave-front propagation' },
+		{ id: 'scribble', label: 'Scribble', sub: 'darkness-chasing lines' },
+		{ id: 'fluid', label: 'Fluid', sub: 'sweeping curves' },
+		{ id: 'waves', label: 'Waves', sub: 'squiggle scanlines' },
+	] as const;
+
+	type StyleId = (typeof STYLES)[number]['id'];
+
+	const SKETCH_STYLE_PRESETS: Partial<Record<StyleId, SketchPreset[]>> = {
+		scribble: SCRIBBLE_PRESETS,
+		fluid: FLUID_PRESETS,
+		waves: WAVES_PRESETS,
+	};
 
 	let selectedFile = $state<File | null>(null);
+	let selectedStyle = $state<StyleId>('contours');
 	let selectedPreset = $state('A');
+	let sketchProgress = $state<string | null>(null);
+	let seed = $state(Math.floor(Math.random() * 100000));
+
+	function rerollSeed() {
+		seed = Math.floor(Math.random() * 100000);
+	}
+
+	// waves is deterministic, contours runs on the backend — seed only matters here
+	const seedRelevant = $derived(selectedStyle === 'scribble' || selectedStyle === 'fluid');
 	let svgContent = $state<string | null>(null);
 	let isProcessing = $state(false);
 	let coverActive = $state(false);
@@ -66,7 +93,7 @@
 
 			const tl = gsap.timeline({
 				defaults: { ease: 'power3.out' },
-				onComplete: () => gsap.set([...heroItems, ...sections], { clearProps: 'all' }),
+				onComplete: () => { gsap.set([...heroItems, ...sections], { clearProps: 'all' }); },
 			});
 
 			tl.from(heroItems, { opacity: 0, y: isDesktop ? -12 : -6, stagger: 0.1, duration: 0.55 })
@@ -83,24 +110,34 @@
 		isProcessing = true;
 		coverActive = true;
 		errorMessage = null;
-
-		const formData = new FormData();
-		formData.append('image', selectedFile);
-		formData.append('preset', selectedPreset);
+		sketchProgress = null;
 
 		try {
-			const res = await fetch('/api/process', { method: 'POST', body: formData });
-			if (!res.ok) {
-				let detail = 'Processing failed';
-				try { const err = await res.json(); detail = err.detail || detail; } catch {}
-				throw new Error(detail);
+			const stylePresets = SKETCH_STYLE_PRESETS[selectedStyle];
+			if (stylePresets) {
+				const preset = stylePresets.find((p) => p.id === selectedPreset) ?? stylePresets[0];
+				svgContent = await runSketch(selectedFile, preset.params, seed, (done, total) => {
+					sketchProgress = `${Math.round((done / total) * 100)}%`;
+				});
+			} else {
+				const formData = new FormData();
+				formData.append('image', selectedFile);
+				formData.append('preset', selectedPreset);
+
+				const res = await fetch('/api/process', { method: 'POST', body: formData });
+				if (!res.ok) {
+					let detail = 'Processing failed';
+					try { const err = await res.json(); detail = err.detail || detail; } catch {}
+					throw new Error(detail);
+				}
+				svgContent = await res.text();
 			}
-			svgContent = await res.text();
 		} catch (e) {
 			errorMessage = e instanceof Error ? e.message : 'Something went wrong';
 			coverActive = false;
 		} finally {
 			isProcessing = false;
+			sketchProgress = null;
 		}
 	}
 
@@ -139,9 +176,50 @@
 				</div>
 
 				<div class="ctrl-section">
-					<p class="ctrl-label">(preset)</p>
-					<PresetPicker bind:selected={selectedPreset} />
+					<p class="ctrl-label">(style)</p>
+					<div class="styles">
+						{#each STYLES as style}
+							<button
+								class="style-btn"
+								class:active={selectedStyle === style.id}
+								onclick={() => (selectedStyle = style.id)}
+							>
+								<span class="style-name">{style.label}</span>
+								<span class="style-sub">{style.sub}</span>
+							</button>
+						{/each}
+					</div>
 				</div>
+
+				<div class="ctrl-section">
+					<p class="ctrl-label">(preset)</p>
+					{#if SKETCH_STYLE_PRESETS[selectedStyle]}
+						<PresetPicker
+							bind:selected={selectedPreset}
+							presets={SKETCH_STYLE_PRESETS[selectedStyle]!.map(({ id, desc }) => ({ id, desc }))}
+						/>
+					{:else}
+						<PresetPicker bind:selected={selectedPreset} />
+					{/if}
+				</div>
+
+				{#if seedRelevant}
+					<div class="ctrl-section">
+						<p class="ctrl-label">(seed)</p>
+						<div class="seed-row">
+							<input
+								class="seed-input"
+								type="number"
+								bind:value={seed}
+								min="0"
+								max="999999"
+								aria-label="random seed"
+							/>
+							<button class="seed-reroll" onclick={rerollSeed} title="new random seed">↻</button>
+						</div>
+						<p class="seed-hint">same seed = identical drawing</p>
+					</div>
+				{/if}
 
 				<div class="ctrl-section">
 					<p class="ctrl-label">(generate)</p>
@@ -151,7 +229,11 @@
 						onclick={generate}
 						disabled={!selectedFile || coverActive}
 					>
-						{coverActive ? 'processing...' : 'Generate Contours →'}
+						{coverActive
+							? sketchProgress
+								? `drawing… ${sketchProgress}`
+								: 'processing...'
+							: `Generate ${STYLES.find((s) => s.id === selectedStyle)?.label} →`}
 					</button>
 					{#if errorMessage}
 						<p class="error">{errorMessage}</p>
@@ -297,6 +379,114 @@
 		font-size: 0.95rem;
 		color: var(--text-dim);
 		margin-bottom: 0.65rem;
+	}
+
+	/* ── Style toggle ── */
+
+	.styles {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.3rem;
+	}
+
+	.style-btn {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		padding: 0.55rem 0.65rem;
+		border: 1px solid var(--border-mid);
+		border-radius: var(--radius-sm);
+		background: transparent;
+		text-align: left;
+		cursor: pointer;
+		transition: border-color 0.12s, color 0.12s, background 0.12s;
+	}
+
+	.style-name {
+		font-family: var(--font-sans);
+		font-weight: 600;
+		font-size: 0.72rem;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--text-faint);
+		transition: color 0.12s;
+	}
+
+	.style-sub {
+		font-family: var(--font-mono);
+		font-size: 0.55rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--text-faint);
+		opacity: 0.7;
+	}
+
+	.style-btn:hover {
+		border-color: var(--border);
+	}
+
+	.style-btn:hover .style-name {
+		color: var(--text);
+	}
+
+	.style-btn.active {
+		border-color: var(--border);
+		background: var(--text);
+	}
+
+	.style-btn.active .style-name,
+	.style-btn.active .style-sub {
+		color: var(--bg);
+	}
+
+	/* ── Seed control ── */
+
+	.seed-row {
+		display: flex;
+		gap: 0.3rem;
+	}
+
+	.seed-input {
+		flex: 1;
+		min-width: 0;
+		padding: 0.45rem 0.6rem;
+		border: 1px solid var(--border-mid);
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--text);
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+	}
+
+	.seed-input:focus {
+		outline: none;
+		border-color: var(--border);
+	}
+
+	.seed-reroll {
+		width: 2.2rem;
+		border: 1px solid var(--border-mid);
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--text-faint);
+		font-size: 0.9rem;
+		cursor: pointer;
+		transition: border-color 0.12s, color 0.12s;
+	}
+
+	.seed-reroll:hover {
+		border-color: var(--border);
+		color: var(--text);
+	}
+
+	.seed-hint {
+		margin-top: 0.45rem;
+		font-family: var(--font-mono);
+		font-size: 0.58rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text-faint);
 	}
 
 	/* ── Generate button ── */
