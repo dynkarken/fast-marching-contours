@@ -5,6 +5,7 @@
 	import PresetPicker from '$lib/components/PresetPicker.svelte';
 	import SvgViewer from '$lib/components/SvgViewer.svelte';
 	import PixelTransition from '$lib/components/PixelTransition.svelte';
+	import Topbar from '$lib/components/Topbar.svelte';
 	import { runSketch, SCRIBBLE_PRESETS, FLUID_PRESETS, WAVES_PRESETS } from '$lib/sketch';
 	import type { SketchPreset } from '$lib/sketch';
 
@@ -147,14 +148,7 @@
 </script>
 
 <div class="page">
-	<!-- Top bar -->
-	<nav class="topbar">
-		<div class="brand">
-			<em class="brand-soft">.soft</em>
-			<span class="brand-name">CONTOURS</span>
-		</div>
-		<span class="topbar-right">fast marching method</span>
-	</nav>
+	<Topbar />
 
 	<!-- Main: left panel (header + controls) | right panel (result) -->
 	<div class="main">
@@ -268,48 +262,6 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 100dvh;
-	}
-
-	/* ── Top bar ── */
-
-	.topbar {
-		flex-shrink: 0;
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.85rem 1.5rem;
-		border-bottom: 1px solid var(--border-light);
-	}
-
-	.brand {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.2rem;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		padding: 0.2rem 0.5rem 0.25rem;
-		line-height: 1;
-	}
-
-	.brand-soft {
-		font-family: var(--font-serif);
-		font-style: italic;
-		font-size: 0.85rem;
-	}
-
-	.brand-name {
-		font-family: var(--font-sans);
-		font-weight: 700;
-		font-size: 0.78rem;
-		letter-spacing: 0.08em;
-	}
-
-	.topbar-right {
-		font-family: var(--font-mono);
-		font-size: 0.62rem;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		color: var(--text-faint);
 	}
 
 	/* ── Main area ── */

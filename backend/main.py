@@ -1,11 +1,16 @@
 import asyncio
+import sys
+from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from starlette.middleware.gzip import GZipMiddleware
 
 from processing import PRESETS, process_image
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from husportræt import generate_from_address
 
 app = FastAPI()
 
@@ -50,3 +55,25 @@ async def process(
 @app.get("/presets")
 def get_presets():
     return PRESETS
+
+
+@app.get("/husportraet")
+async def husportraet(
+    address: str = Query(..., min_length=3),
+    scale: int = Query(1000),
+):
+    if scale not in (1000, 5000):
+        raise HTTPException(400, "Scale must be 1000 or 5000")
+
+    try:
+        svg_content, info = await asyncio.to_thread(generate_from_address, address, scale)
+    except SystemExit as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Generation failed: {str(e)}")
+
+    return Response(
+        content=svg_content,
+        media_type="image/svg+xml",
+        headers={"Content-Disposition": 'inline; filename="husportraet.svg"'},
+    )
