@@ -118,7 +118,7 @@ def _get_model():
     global _deepforest_model
     if _deepforest_model is None:
         _deepforest_model = deepforest_main.deepforest()
-        _deepforest_model.use_release()
+        _deepforest_model.load_model("weecology/deepforest-tree")
     return _deepforest_model
 
 
