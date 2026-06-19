@@ -88,3 +88,42 @@ def fetch_esri_tiles(
             canvas.paste(tile_img, (px, py))
 
     return canvas, x_min, y_min, zoom
+
+
+def pixels_to_local(
+    pixel_points: list[tuple[int, int]],
+    tile_x_min: int,
+    tile_y_min: int,
+    zoom: int,
+    lat0: float,
+    lon0: float,
+) -> list[tuple[float, float]]:
+    """Convert pixel coords in the stitched image to local (x_m, y_m) map coords."""
+    result = []
+    for px, py in pixel_points:
+        lat, lon = pixel_to_latlon(px, py, tile_x_min, tile_y_min, zoom)
+        mid_lat = math.radians((lat + lat0) / 2.0)
+        x_m = math.radians(lon - lon0) * math.cos(mid_lat) * R_EARTH
+        y_m = math.radians(lat - lat0) * R_EARTH
+        result.append((x_m, y_m))
+    return result
+
+
+def merge_trees(
+    osm_trees: list[tuple[float, float]],
+    aerial_trees: list[tuple[float, float]],
+    dedup_radius: float = 5.0,
+) -> list[tuple[float, float]]:
+    """
+    Merge OSM and aerial tree lists. Drop any aerial tree within dedup_radius
+    meters of an existing OSM tree. OSM data is authoritative.
+    """
+    merged = list(osm_trees)
+    for ax, ay in aerial_trees:
+        too_close = any(
+            math.hypot(ax - ox, ay - oy) < dedup_radius
+            for ox, oy in osm_trees
+        )
+        if not too_close:
+            merged.append((ax, ay))
+    return merged

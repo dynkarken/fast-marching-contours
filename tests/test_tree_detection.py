@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from PIL import Image
 import io
-from tree_detection import latlon_to_tile_xy, pixel_to_latlon, fetch_esri_tiles, zoom_for_scale
+from tree_detection import latlon_to_tile_xy, pixel_to_latlon, fetch_esri_tiles, zoom_for_scale, pixels_to_local, merge_trees
 
 
 def test_latlon_to_tile_xy_known_point():
@@ -73,3 +73,41 @@ def test_fetch_esri_tiles_stitches_correctly():
     assert img.height >= 256
     assert z == zoom
     assert mock_get.called
+
+
+def test_pixels_to_local_center_pixel():
+    zoom = 18
+    lat0, lon0 = 55.6761, 12.5683
+    tile_x_min, tile_y_min = latlon_to_tile_xy(lat0, lon0, zoom)
+    pts = pixels_to_local([(128, 128)], tile_x_min, tile_y_min, zoom, lat0, lon0)
+    x_m, y_m = pts[0]
+    # Pixel (128, 128) of the tile containing (lat0, lon0) should be near origin
+    assert abs(x_m) < 150
+    assert abs(y_m) < 150
+
+
+def test_merge_trees_keeps_all_when_far_apart():
+    osm = [(0.0, 0.0), (100.0, 0.0)]
+    aerial = [(50.0, 0.0), (200.0, 0.0)]
+    merged = merge_trees(osm, aerial, dedup_radius=5.0)
+    assert len(merged) == 4
+
+
+def test_merge_trees_deduplicates_close_points():
+    osm = [(0.0, 0.0)]
+    aerial = [(3.0, 0.0)]  # within 5 m
+    merged = merge_trees(osm, aerial, dedup_radius=5.0)
+    assert len(merged) == 1
+    assert merged[0] == (0.0, 0.0)
+
+
+def test_merge_trees_empty_aerial():
+    osm = [(10.0, 20.0)]
+    merged = merge_trees(osm, [], dedup_radius=5.0)
+    assert merged == [(10.0, 20.0)]
+
+
+def test_merge_trees_empty_osm():
+    aerial = [(10.0, 20.0)]
+    merged = merge_trees([], aerial, dedup_radius=5.0)
+    assert merged == [(10.0, 20.0)]
