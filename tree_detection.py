@@ -5,8 +5,10 @@ import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import io
 
+import numpy as np
 import requests
 from PIL import Image
+from deepforest import main as deepforest_main
 
 TILE_SIZE = 256
 ESRI_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -107,6 +109,34 @@ def pixels_to_local(
         y_m = math.radians(lat - lat0) * R_EARTH
         result.append((x_m, y_m))
     return result
+
+
+_deepforest_model = None
+
+
+def _get_model():
+    global _deepforest_model
+    if _deepforest_model is None:
+        _deepforest_model = deepforest_main.deepforest()
+        _deepforest_model.use_release()
+    return _deepforest_model
+
+
+def detect_trees_deepforest(image: Image.Image) -> list[tuple[int, int]]:
+    """
+    Run DeepForest tree crown detection on a PIL Image.
+    Returns a list of (px, py) pixel centers for each detected tree crown.
+    """
+    model = _get_model()
+    img_array = np.array(image)
+    predictions = model.predict_image(image=img_array, return_plot=False)
+    if predictions is None or len(predictions) == 0:
+        return []
+    centers = [
+        (int((row.xmin + row.xmax) / 2), int((row.ymin + row.ymax) / 2))
+        for _, row in predictions.iterrows()
+    ]
+    return centers
 
 
 def merge_trees(

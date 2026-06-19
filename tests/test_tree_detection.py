@@ -111,3 +111,46 @@ def test_merge_trees_empty_osm():
     aerial = [(10.0, 20.0)]
     merged = merge_trees([], aerial, dedup_radius=5.0)
     assert merged == [(10.0, 20.0)]
+
+
+import numpy as np
+import pandas as pd
+from tree_detection import detect_trees_deepforest
+import tree_detection
+
+
+def test_detect_trees_deepforest_returns_centers():
+    fake_image = Image.new("RGB", (512, 512), (34, 100, 34))
+
+    fake_df = pd.DataFrame({
+        "xmin": [10.0, 200.0],
+        "ymin": [20.0, 300.0],
+        "xmax": [50.0, 240.0],
+        "ymax": [60.0, 340.0],
+        "score": [0.9, 0.85],
+        "label": ["Tree", "Tree"],
+    })
+
+    mock_model = MagicMock()
+    mock_model.predict_image.return_value = fake_df
+
+    with patch("tree_detection.deepforest_main.deepforest", return_value=mock_model):
+        tree_detection._deepforest_model = None
+        centers = detect_trees_deepforest(fake_image)
+
+    assert len(centers) == 2
+    assert centers[0] == (30, 40)
+    assert centers[1] == (220, 320)
+
+
+def test_detect_trees_deepforest_returns_empty_on_none():
+    fake_image = Image.new("RGB", (256, 256), (0, 0, 0))
+
+    mock_model = MagicMock()
+    mock_model.predict_image.return_value = None
+
+    with patch("tree_detection.deepforest_main.deepforest", return_value=mock_model):
+        tree_detection._deepforest_model = None
+        centers = detect_trees_deepforest(fake_image)
+
+    assert centers == []
