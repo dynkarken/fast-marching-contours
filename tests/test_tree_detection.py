@@ -23,6 +23,8 @@ def test_pixel_to_latlon_tile_origin():
     n = 2 ** zoom
     lat, lon = pixel_to_latlon(0, 0, tile_x, tile_y, zoom)
     expected_lon = tile_x / n * 360.0 - 180.0
+    expected_lat = math.degrees(math.atan(math.sinh(math.pi * (1.0 - 2.0 * tile_y / n))))
+    assert abs(lat - expected_lat) < 1e-6
     assert abs(lon - expected_lon) < 1e-6
 
 
