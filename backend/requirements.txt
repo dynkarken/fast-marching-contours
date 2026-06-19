@@ -5,5 +5,5 @@ numpy
 scikit-image
 scikit-fmm
 matplotlib
-deepforest
+scipy
 Pillow

@@ -8,7 +8,9 @@ import io
 import numpy as np
 import requests
 from PIL import Image
-from deepforest import main as deepforest_main
+from scipy import ndimage
+from skimage import morphology, feature
+from skimage.color import rgb2hsv
 
 TILE_SIZE = 256
 ESRI_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -111,32 +113,44 @@ def pixels_to_local(
     return result
 
 
-_deepforest_model = None
-
-
-def _get_model():
-    global _deepforest_model
-    if _deepforest_model is None:
-        _deepforest_model = deepforest_main.deepforest()
-        _deepforest_model.load_model("weecology/deepforest-tree")
-    return _deepforest_model
-
-
-def detect_trees_deepforest(image: Image.Image) -> list[tuple[int, int]]:
+def detect_trees_vegetation(image: Image.Image) -> list[tuple[int, int]]:
     """
-    Run DeepForest tree crown detection on a PIL Image.
-    Returns a list of (px, py) pixel centers for each detected tree crown.
+    Detect tree crowns from a satellite RGB image using a vegetation mask +
+    local texture filter + distance-transform peak finding.
+
+    Returns a list of (px, py) pixel centres for each detected tree crown.
+
+    Works at zoom 18 (~0.6 m/px, ESRI World Imagery). Trees appear as dark,
+    saturated, textured green blobs; lawns are brighter and more uniform.
     """
-    model = _get_model()
-    img_array = np.array(image)
-    predictions = model.predict_image(image=img_array.astype("float32"))
-    if predictions is None or len(predictions) == 0:
-        return []
-    centers = [
-        (int((row.xmin + row.xmax) / 2), int((row.ymin + row.ymax) / 2))
-        for _, row in predictions.iterrows()
-    ]
-    return centers
+    arr = np.array(image)
+    g = arr[:, :, 1].astype(float)
+    r = arr[:, :, 0].astype(float)
+    b = arr[:, :, 2].astype(float)
+    hsv = rgb2hsv(arr)
+    V = hsv[:, :, 2]  # brightness (0=black, 1=white)
+    S = hsv[:, :, 1]  # saturation
+
+    # Coarse vegetation gate: green channel dominates
+    veg = (g > r * 1.08) & (g > b * 0.9) & (g > 50)
+
+    # Refine to dark, saturated green (tree crowns cast shadows; lawns are brighter)
+    dark_green = veg & (V < 0.45) & (S > 0.2)
+
+    # Texture: high local variance in green channel distinguishes foliage from lawn
+    local_sq = ndimage.uniform_filter(g ** 2, size=7)
+    local_mu = ndimage.uniform_filter(g, size=7)
+    texture = np.sqrt(np.maximum(local_sq - local_mu ** 2, 0))
+    tree_mask = dark_green & (texture > 12)
+
+    # Morphological opening removes thin strips (hedges, road markings)
+    tree_mask = morphology.opening(tree_mask, morphology.disk(3))
+
+    # Distance transform peak finding: one peak per crown
+    # min_distance=15 px ≈ 9 m minimum crown-to-crown spacing at zoom 18
+    dist = ndimage.distance_transform_edt(tree_mask)
+    seeds = feature.peak_local_max(dist, min_distance=15, threshold_abs=4.0)
+    return [(int(x), int(y)) for y, x in seeds]
 
 
 def merge_trees(
@@ -166,7 +180,7 @@ def fetch_trees_aerial(
     scale: int,
 ) -> list[tuple[float, float]]:
     """
-    Fetch satellite tiles, detect tree crowns with DeepForest, and return
+    Fetch satellite tiles, detect tree crowns from the vegetation mask, and return
     tree positions as local (x_m, y_m) coords. Returns [] on any error.
     """
     try:
@@ -174,7 +188,7 @@ def fetch_trees_aerial(
         print(f"  Henter satellit-tiles (zoom {zoom}) …")
         image, tile_x_min, tile_y_min, zoom = fetch_esri_tiles(lat0, lon0, radius_m, zoom)
         print(f"  Kører trædetektering på {image.width}×{image.height} px billede …")
-        pixel_centers = detect_trees_deepforest(image)
+        pixel_centers = detect_trees_vegetation(image)
         print(f"  Detekterede {len(pixel_centers)} træer fra luftfoto")
         local_pts = pixels_to_local(pixel_centers, tile_x_min, tile_y_min, zoom, lat0, lon0)
         return local_pts

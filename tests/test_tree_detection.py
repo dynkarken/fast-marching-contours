@@ -4,7 +4,17 @@ import pytest
 from unittest.mock import patch, MagicMock
 from PIL import Image
 import io
-from tree_detection import latlon_to_tile_xy, pixel_to_latlon, fetch_esri_tiles, zoom_for_scale, pixels_to_local, merge_trees
+import numpy as np
+from tree_detection import (
+    latlon_to_tile_xy,
+    pixel_to_latlon,
+    fetch_esri_tiles,
+    zoom_for_scale,
+    pixels_to_local,
+    merge_trees,
+    detect_trees_vegetation,
+    fetch_trees_aerial,
+)
 
 
 def test_latlon_to_tile_xy_known_point():
@@ -113,78 +123,52 @@ def test_merge_trees_empty_osm():
     assert merged == [(10.0, 20.0)]
 
 
-import numpy as np
-import pandas as pd
-from tree_detection import detect_trees_deepforest
-import tree_detection
+def _make_tree_image(size: int = 256) -> Image.Image:
+    """
+    Synthetic image with one clear dark-green textured blob in the centre.
+    Mimics a tree crown at satellite zoom 18 (dark, saturated, slightly noisy green).
+    """
+    arr = np.full((size, size, 3), (180, 180, 180), dtype=np.uint8)  # grey background
+    rng = np.random.default_rng(42)
+    cy, cx = size // 2, size // 2
+    radius = 20
+    for y in range(size):
+        for x in range(size):
+            if (x - cx) ** 2 + (y - cy) ** 2 < radius ** 2:
+                # Dark saturated green with texture noise (±25 gives std≈14 > threshold 12)
+                noise = int(rng.integers(-25, 25))
+                arr[y, x] = (max(0, 30 + noise), max(0, 80 + noise), max(0, 20 + noise))
+    return Image.fromarray(arr, "RGB")
 
 
-def test_detect_trees_deepforest_returns_centers():
-    fake_image = Image.new("RGB", (512, 512), (34, 100, 34))
-
-    fake_df = pd.DataFrame({
-        "xmin": [10.0, 200.0],
-        "ymin": [20.0, 300.0],
-        "xmax": [50.0, 240.0],
-        "ymax": [60.0, 340.0],
-        "score": [0.9, 0.85],
-        "label": ["Tree", "Tree"],
-    })
-
-    mock_model = MagicMock()
-    mock_model.predict_image.return_value = fake_df
-
-    with patch("tree_detection.deepforest_main.deepforest", return_value=mock_model):
-        tree_detection._deepforest_model = None
-        centers = detect_trees_deepforest(fake_image)
-
-    assert len(centers) == 2
-    assert centers[0] == (30, 40)
-    assert centers[1] == (220, 320)
+def test_detect_trees_vegetation_finds_single_crown():
+    image = _make_tree_image(256)
+    centers = detect_trees_vegetation(image)
+    assert len(centers) >= 1
+    # The detected crown should be near the centre of the image
+    cx, cy = 128, 128
+    assert any(abs(px - cx) < 30 and abs(py - cy) < 30 for px, py in centers)
 
 
-def test_detect_trees_deepforest_returns_empty_on_none():
-    fake_image = Image.new("RGB", (256, 256), (0, 0, 0))
-
-    mock_model = MagicMock()
-    mock_model.predict_image.return_value = None
-
-    with patch("tree_detection.deepforest_main.deepforest", return_value=mock_model):
-        tree_detection._deepforest_model = None
-        centers = detect_trees_deepforest(fake_image)
-
+def test_detect_trees_vegetation_no_detections_on_grey():
+    grey = Image.new("RGB", (256, 256), (128, 128, 128))
+    centers = detect_trees_vegetation(grey)
     assert centers == []
 
 
 def test_fetch_trees_aerial_end_to_end():
-    from tree_detection import fetch_trees_aerial
-
     lat0, lon0 = 55.6761, 12.5683
     radius_m = 300.0
     scale = 1000
 
-    fake_tile_bytes = _make_fake_tile_bytes()
-
-    fake_df = pd.DataFrame({
-        "xmin": [100.0],
-        "ymin": [100.0],
-        "xmax": [140.0],
-        "ymax": [140.0],
-        "score": [0.9],
-        "label": ["Tree"],
-    })
-
-    mock_model = MagicMock()
-    mock_model.predict_image.return_value = fake_df
+    # Use a uniform dark-green tile so vegetation mask fires and returns detections
+    fake_tile_bytes = _make_fake_tile_bytes(color=(30, 90, 20))
 
     mock_resp = MagicMock()
     mock_resp.raise_for_status = MagicMock()
     mock_resp.content = fake_tile_bytes
 
-    tree_detection._deepforest_model = None
-
-    with patch("tree_detection.requests.get", return_value=mock_resp), \
-         patch("tree_detection.deepforest_main.deepforest", return_value=mock_model):
+    with patch("tree_detection.requests.get", return_value=mock_resp):
         trees = fetch_trees_aerial(lat0, lon0, radius_m, scale)
 
     assert isinstance(trees, list)
@@ -194,8 +178,6 @@ def test_fetch_trees_aerial_end_to_end():
 
 
 def test_fetch_trees_aerial_falls_back_on_error():
-    from tree_detection import fetch_trees_aerial
-
     lat0, lon0 = 55.6761, 12.5683
     with patch("tree_detection.requests.get", side_effect=Exception("network error")):
         trees = fetch_trees_aerial(lat0, lon0, 300.0, 1000)
