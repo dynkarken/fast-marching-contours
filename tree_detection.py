@@ -157,3 +157,27 @@ def merge_trees(
         if not too_close:
             merged.append((ax, ay))
     return merged
+
+
+def fetch_trees_aerial(
+    lat0: float,
+    lon0: float,
+    radius_m: float,
+    scale: int,
+) -> list[tuple[float, float]]:
+    """
+    Fetch satellite tiles, detect tree crowns with DeepForest, and return
+    tree positions as local (x_m, y_m) coords. Returns [] on any error.
+    """
+    try:
+        zoom = zoom_for_scale(scale)
+        print(f"  Henter satellit-tiles (zoom {zoom}) …")
+        image, tile_x_min, tile_y_min, zoom = fetch_esri_tiles(lat0, lon0, radius_m, zoom)
+        print(f"  Kører trædetektering på {image.width}×{image.height} px billede …")
+        pixel_centers = detect_trees_deepforest(image)
+        print(f"  Detekterede {len(pixel_centers)} træer fra luftfoto")
+        local_pts = pixels_to_local(pixel_centers, tile_x_min, tile_y_min, zoom, lat0, lon0)
+        return local_pts
+    except Exception as e:
+        print(f"  ⚠ Trædetektering fejlede ({e}), bruger kun OSM-træer")
+        return []

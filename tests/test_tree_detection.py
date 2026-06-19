@@ -154,3 +154,49 @@ def test_detect_trees_deepforest_returns_empty_on_none():
         centers = detect_trees_deepforest(fake_image)
 
     assert centers == []
+
+
+def test_fetch_trees_aerial_end_to_end():
+    from tree_detection import fetch_trees_aerial
+
+    lat0, lon0 = 55.6761, 12.5683
+    radius_m = 300.0
+    scale = 1000
+
+    fake_tile_bytes = _make_fake_tile_bytes()
+
+    fake_df = pd.DataFrame({
+        "xmin": [100.0],
+        "ymin": [100.0],
+        "xmax": [140.0],
+        "ymax": [140.0],
+        "score": [0.9],
+        "label": ["Tree"],
+    })
+
+    mock_model = MagicMock()
+    mock_model.predict_image.return_value = fake_df
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.content = fake_tile_bytes
+
+    tree_detection._deepforest_model = None
+
+    with patch("tree_detection.requests.get", return_value=mock_resp), \
+         patch("tree_detection.deepforest_main.deepforest", return_value=mock_model):
+        trees = fetch_trees_aerial(lat0, lon0, radius_m, scale)
+
+    assert isinstance(trees, list)
+    for x_m, y_m in trees:
+        assert isinstance(x_m, float)
+        assert isinstance(y_m, float)
+
+
+def test_fetch_trees_aerial_falls_back_on_error():
+    from tree_detection import fetch_trees_aerial
+
+    lat0, lon0 = 55.6761, 12.5683
+    with patch("tree_detection.requests.get", side_effect=Exception("network error")):
+        trees = fetch_trees_aerial(lat0, lon0, 300.0, 1000)
+    assert trees == []
