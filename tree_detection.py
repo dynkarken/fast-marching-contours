@@ -70,11 +70,11 @@ def fetch_esri_tiles(
     lon_min = lon0 - pad * deg_per_m_lon
     lon_max = lon0 + pad * deg_per_m_lon
 
-    x_min, y_max = latlon_to_tile_xy(lat_max, lon_min, zoom)  # NW corner
-    x_max, y_min = latlon_to_tile_xy(lat_min, lon_max, zoom)  # SE corner
+    x_min, y_top = latlon_to_tile_xy(lat_max, lon_min, zoom)  # NW corner → smallest y
+    x_max, y_bot = latlon_to_tile_xy(lat_min, lon_max, zoom)  # SE corner → largest y
 
     cols = list(range(x_min, x_max + 1))
-    rows = list(range(min(y_min, y_max), max(y_min, y_max) + 1))
+    rows = list(range(y_top, y_bot + 1))
 
     canvas_w = len(cols) * TILE_SIZE
     canvas_h = len(rows) * TILE_SIZE
@@ -86,10 +86,10 @@ def fetch_esri_tiles(
         for future in as_completed(futures):
             tx, ty, tile_img = future.result()
             px = (tx - x_min) * TILE_SIZE
-            py = (ty - y_min) * TILE_SIZE
+            py = (ty - y_top) * TILE_SIZE
             canvas.paste(tile_img, (px, py))
 
-    return canvas, x_min, y_min, zoom
+    return canvas, x_min, y_top, zoom
 
 
 def pixels_to_local(
