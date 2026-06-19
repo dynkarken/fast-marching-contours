@@ -129,7 +129,7 @@ def detect_trees_deepforest(image: Image.Image) -> list[tuple[int, int]]:
     """
     model = _get_model()
     img_array = np.array(image)
-    predictions = model.predict_image(image=img_array, return_plot=False)
+    predictions = model.predict_image(image=img_array.astype("float32"))
     if predictions is None or len(predictions) == 0:
         return []
     centers = [
