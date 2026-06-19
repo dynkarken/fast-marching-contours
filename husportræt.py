@@ -21,6 +21,8 @@ from pathlib import Path
 
 import requests
 
+from tree_detection import fetch_trees_aerial, merge_trees
+
 
 # ── Papirformat A2 ─────────────────────────────────────────────────────────────
 PAPER_W = 420.0   # mm
@@ -215,9 +217,9 @@ out skel qt;
     print(f"  Henter OSM-data inden for {radius_m:.0f} m …")
     for url in OVERPASS_URLS:
         try:
-            r = requests.get(
+            r = requests.post(
                 url,
-                params={"data": query},
+                data={"data": query},
                 headers={"User-Agent": "husportraet-generator/1.0"},
                 timeout=120,
             )
@@ -469,13 +471,18 @@ def generate_from_address(address: str, scale: int = 1000) -> tuple[str, dict]:
     diag_m = math.hypot(PAPER_W, PAPER_H) / 2.0 / 1000.0 * scale
     radius_m = diag_m * 1.10
     raw = fetch_osm(lat, lon, radius_m)
-    buildings, roads, waters, trees = parse_osm(raw, lat, lon)
+    buildings, roads, waters, osm_trees = parse_osm(raw, lat, lon)
+    aerial_trees = fetch_trees_aerial(lat, lon, radius_m, scale)
+    trees = merge_trees(osm_trees, aerial_trees)
     selected_ids = find_selected(buildings, matrikel)
     svg = generate_svg(buildings, roads, waters, trees, selected_ids, scale, matrikel, output=None)
     info = {
         "lat": lat, "lon": lon,
         "buildings": len(buildings), "roads": len(roads),
-        "waters": len(waters), "trees": len(trees),
+        "waters": len(waters),
+        "trees": len(trees),
+        "trees_osm": len(osm_trees),
+        "trees_aerial": len(aerial_trees),
         "selected_ids": list(selected_ids),
     }
     return svg, info
@@ -521,12 +528,14 @@ def main() -> None:
 
     raw = fetch_osm(lat, lon, radius_m)
 
-    buildings, roads, waters, trees = parse_osm(raw, lat, lon)
+    buildings, roads, waters, osm_trees = parse_osm(raw, lat, lon)
+    aerial_trees = fetch_trees_aerial(lat, lon, radius_m, args.scale)
+    trees = merge_trees(osm_trees, aerial_trees)
     print(
         f"  Bygninger: {len(buildings)}"
         f"  |  Veje: {len(roads)}"
         f"  |  Vand: {len(waters)}"
-        f"  |  Træer: {len(trees)}"
+        f"  |  Træer: {len(trees)} (OSM: {len(osm_trees)}, luftfoto: {len(aerial_trees)})"
     )
 
     selected_ids = find_selected(buildings, matrikel)
