@@ -34,3 +34,57 @@ def pixel_to_latlon(px: int, py: int, tile_x_min: int, tile_y_min: int, zoom: in
     lon = global_px / (n * TILE_SIZE) * 360.0 - 180.0
     lat = math.degrees(math.atan(math.sinh(math.pi * (1.0 - 2.0 * global_py / (n * TILE_SIZE)))))
     return lat, lon
+
+
+def zoom_for_scale(scale: int) -> int:
+    """Return the zoom level for the given scale in meters."""
+    return 18 if scale <= 1000 else 17
+
+
+def _download_tile(z: int, x: int, y: int) -> tuple[int, int, Image.Image]:
+    """Download a single ESRI tile and return (x, y, image)."""
+    url = ESRI_URL.format(z=z, x=x, y=y)
+    r = requests.get(url, timeout=15)
+    r.raise_for_status()
+    img = Image.open(io.BytesIO(r.content)).convert("RGB")
+    return x, y, img
+
+
+def fetch_esri_tiles(
+    lat0: float, lon0: float, radius_m: float, zoom: int
+) -> tuple[Image.Image, int, int, int]:
+    """
+    Download and stitch ESRI World Imagery tiles covering a circle of radius_m
+    around (lat0, lon0) at the given zoom level.
+
+    Returns (stitched_image, tile_x_min, tile_y_min, zoom).
+    """
+    deg_per_m_lat = 1.0 / (R_EARTH * math.pi / 180.0)
+    deg_per_m_lon = deg_per_m_lat / math.cos(math.radians(lat0))
+    pad = radius_m * 1.05
+
+    lat_min = lat0 - pad * deg_per_m_lat
+    lat_max = lat0 + pad * deg_per_m_lat
+    lon_min = lon0 - pad * deg_per_m_lon
+    lon_max = lon0 + pad * deg_per_m_lon
+
+    x_min, y_max = latlon_to_tile_xy(lat_max, lon_min, zoom)  # NW corner
+    x_max, y_min = latlon_to_tile_xy(lat_min, lon_max, zoom)  # SE corner
+
+    cols = list(range(x_min, x_max + 1))
+    rows = list(range(min(y_min, y_max), max(y_min, y_max) + 1))
+
+    canvas_w = len(cols) * TILE_SIZE
+    canvas_h = len(rows) * TILE_SIZE
+    canvas = Image.new("RGB", (canvas_w, canvas_h))
+
+    tasks = [(zoom, x, y) for y in rows for x in cols]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(_download_tile, z, x, y): (x, y) for z, x, y in tasks}
+        for future in as_completed(futures):
+            tx, ty, tile_img = future.result()
+            px = (tx - x_min) * TILE_SIZE
+            py = (ty - y_min) * TILE_SIZE
+            canvas.paste(tile_img, (px, py))
+
+    return canvas, x_min, y_min, zoom

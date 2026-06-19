@@ -1,7 +1,10 @@
 # tests/test_tree_detection.py
 import math
 import pytest
-from tree_detection import latlon_to_tile_xy, pixel_to_latlon
+from unittest.mock import patch, MagicMock
+from PIL import Image
+import io
+from tree_detection import latlon_to_tile_xy, pixel_to_latlon, fetch_esri_tiles, zoom_for_scale
 
 
 def test_latlon_to_tile_xy_known_point():
@@ -35,3 +38,38 @@ def test_pixel_to_latlon_roundtrip():
     x2, y2 = latlon_to_tile_xy(lat, lon, zoom)
     assert x2 == tile_x
     assert y2 == tile_y
+
+
+def _make_fake_tile_bytes(color=(34, 139, 34)) -> bytes:
+    """Return PNG bytes for a solid-color 256x256 tile."""
+    img = Image.new("RGB", (256, 256), color)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_zoom_for_scale():
+    assert zoom_for_scale(1000) == 18
+    assert zoom_for_scale(5000) == 17
+
+
+def test_fetch_esri_tiles_stitches_correctly():
+    lat0, lon0 = 55.6761, 12.5683
+    radius_m = 200.0
+    zoom = 18
+
+    fake_tile = _make_fake_tile_bytes()
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.content = fake_tile
+
+    with patch("tree_detection.requests.get", return_value=mock_resp) as mock_get:
+        img, tile_x_min, tile_y_min, z = fetch_esri_tiles(lat0, lon0, radius_m, zoom)
+
+    assert isinstance(img, Image.Image)
+    assert img.mode == "RGB"
+    assert img.width >= 256
+    assert img.height >= 256
+    assert z == zoom
+    assert mock_get.called
